@@ -7,28 +7,27 @@ from llama_index.core import (
     StorageContext,
     Settings,
     QueryBundle,
-    PromptTemplate  
+    PromptTemplate
 )
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.google_genai import GoogleGenAI
-from llama_index.postprocessor.flag_embedding_reranker import FlagEmbeddingReranker
+
 
 #CONFIGURATION 
-DB_PERSIST_DIR = "./storage"  # Saved DB 
-COLLECTION_NAME = "road_safety_db" # collection name 
-EMBED_MODEL_NAME = "BAAI/bge-large-en-v1.5" # Embedding model 
-RERANKER_MODEL_NAME = "BAAI/bge-reranker-v2-m3" #  reranker
-LOCAL_LLM_MODEL = "llama3:8b" # Ollama model 
-CLOUD_LLM_MODEL = "models/gemini-1.5-pro" # Google Gemini Pro model
+DB_PERSIST_DIR = "./storage"
+COLLECTION_NAME = "road_safety_db"
+EMBED_MODEL_NAME = "BAAI/bge-large-en-v1.5"
+
+LOCAL_LLM_MODEL = "llama3:8b"
+CLOUD_LLM_MODEL = "models/gemini-1.5-pro"
 
 # Configure logging 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
 
-#PROMPT TEMPLATE 
 
 PROMPT_TEMPLATE = """
 You are a specialized AI assistant for the National Road Safety Hackathon.
@@ -90,19 +89,12 @@ def create_query_engine(llm_to_use):
     )
     print("Successfully loaded index from vector database.")
 
-    #CONFIGURE THE RERANKER
-    print(f"Loading reranker model: {RERANKER_MODEL_NAME}...")
-    reranker = FlagEmbeddingReranker(
-        model=RERANKER_MODEL_NAME,
-        top_n=5,  # Retrieve 10, return 5
-        use_fp16=True 
-    )
-    print("Reranker loaded.")
 
     # QUERY ENGINE 
     query_engine = index.as_query_engine(
-        similarity_top_k=10,
-        node_postprocessors=[reranker],
+
+        similarity_top_k=5,  
+ 
         text_qa_template=PromptTemplate(PROMPT_TEMPLATE)
     )
     print("--- Query Engine is Ready ---")
@@ -140,8 +132,6 @@ if __name__ == "__main__":
     test_query = "What are the rules for a STOP sign?"
     print(f"Query: '{test_query}'")
     
-   
-  
     response = query_engine.query(test_query)
     
     print("\n--- Test Response ---")
@@ -149,6 +139,6 @@ if __name__ == "__main__":
     print("\n--- Source Nodes ---")
     for node in response.source_nodes:
         print(f"Score: {node.score:.4f}")
-        print(f"Metadata: {node.node.metadata}")
+        print(f"Metadata: {node.metadata}")
         print(f"Text: {node.node.get_content()[:100]}...")
         print("---")
