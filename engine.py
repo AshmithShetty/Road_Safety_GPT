@@ -6,7 +6,8 @@ from llama_index.core import (
     VectorStoreIndex,
     StorageContext,
     Settings,
-    QueryBundle
+    QueryBundle,
+    PromptTemplate  
 )
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -26,6 +27,47 @@ CLOUD_LLM_MODEL = "models/gemini-1.5-pro" # Google Gemini Pro model
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
+
+#PROMPT TEMPLATE 
+
+PROMPT_TEMPLATE = """
+You are a specialized AI assistant for the National Road Safety Hackathon.
+Your task is to answer user queries about road safety interventions.
+
+You will be given a context of retrieved database information and a user query.
+Your response MUST follow these rules:
+
+<context>
+{context_str}
+</context>
+
+<query>
+{query_str}
+</query>
+
+---
+INSTRUCTIONS:
+
+1.  **CRITICAL RELEVANCE CHECK:**
+    * First, you *must* determine if the provided <context> *directly and meaningfully* answers the user's <query>.
+    * Ask yourself: "Does this context block contain the *specific intervention or specification* for the problem in the query?"
+    * A simple *mention* of a keyword is NOT a relevant answer.
+
+2.  **If the context IS RELEVANT:**
+    * You MUST generate a response in this strict format:
+    * 1.  **Direct Answer:** Provide a detailed, comprehensive answer to the user's query by **summarizing the key information, specifications, dimensions, and procedures** found *directly* in the context. Explain the "what," "why," and "how" from the text.
+    * 2.  **Source Code:** Extract the exact 'code' (e.g., IRC:67-2022) from the context that supports your answer.
+    * 3.  **Clause:** Extract the exact 'clause' (e.g., 14.4) from the context that supports your answer.
+
+3.  **If the context IS NOT RELEVANT:**
+    * You MUST discard the context.
+    * You MUST generate *only* this exact sentence:
+    * "The provided database does not contain information on this specific topic."
+
+4.  **NEVER** use any outside knowledge or make assumptions.
+"""
+
+
 def create_query_engine(llm_to_use):
     """
     Builds and returns the complete RAG query engine.
@@ -33,37 +75,23 @@ def create_query_engine(llm_to_use):
     print("--- Initializing Query Engine ---")
 
     # CONFIGURE GLOBAL SETTINGS
-    # Set the embedding model
-    
     print(f"Loading embedding model: {EMBED_MODEL_NAME}...")
     Settings.embed_model = HuggingFaceEmbedding(model_name=EMBED_MODEL_NAME)
-    
-    # We set the LLM. This will be either Ollama or Gemini.
     Settings.llm = llm_to_use
     print(f"LLM set to: {llm_to_use.metadata.model_name}")
 
     #  LOAD THE VECTOR DATABASE
     print(f"Loading vector database from: {DB_PERSIST_DIR}")
-    # Initialize ChromaDB client
     db = chromadb.PersistentClient(path=DB_PERSIST_DIR)
-    
-    # Get specific collection
     chroma_collection = db.get_or_create_collection(COLLECTION_NAME)
-    
-    # Assign ChromaDB as vector store
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-    
-    # Load the index from existing vector store
     index = VectorStoreIndex.from_vector_store(
         vector_store=vector_store
     )
     print("Successfully loaded index from vector database.")
 
     #CONFIGURE THE RERANKER
-    # This model runs locally.
     print(f"Loading reranker model: {RERANKER_MODEL_NAME}...")
-    # Takes the top 10 search results
-  
     reranker = FlagEmbeddingReranker(
         model=RERANKER_MODEL_NAME,
         top_n=5,  # Retrieve 10, return 5
@@ -72,10 +100,10 @@ def create_query_engine(llm_to_use):
     print("Reranker loaded.")
 
     # QUERY ENGINE 
-   
     query_engine = index.as_query_engine(
-        similarity_top_k=10,  # Retrieve the top 10 most similar results
-        node_postprocessors=[reranker] # Rerank those 10 to get the best 5
+        similarity_top_k=10,
+        node_postprocessors=[reranker],
+        text_qa_template=PromptTemplate(PROMPT_TEMPLATE)
     )
     print("--- Query Engine is Ready ---")
     return query_engine
@@ -100,31 +128,21 @@ def get_llm(google_api_key=None):
             print("You can download it from https://ollama.com")
             print("After installing, run 'ollama pull llama3:8b' in your terminal.")
             print("-------------")
-            sys.exit(1) # Exit the script if can't connect
+            sys.exit(1) 
 
 #TESTING
-# We can run this file directly to test if our engine works.
 if __name__ == "__main__":
-    # Test LOCAL (Ollama) setup
     print("Testing LOCAL (Ollama) query engine...")
     local_llm = get_llm()
     query_engine = create_query_engine(local_llm)
     
     print("\n--- Test Query ---")
-    print("Query: 'What are the rules for a STOP sign?'")
+    test_query = "What are the rules for a STOP sign?"
+    print(f"Query: '{test_query}'")
     
-    # Format prompt to get better cited answers
-    query_str = """
-    Query: 'What are the rules for a STOP sign?'
-    
-    Please answer the query based *only* on the provided context.
-    For your answer, please provide:
-    1.  The direct answer to the query.
-    2.  The source 'code' (e.g., IRC:67-2022).
-    3.  The source 'clause' (e.g., 14.4).
-    """
-    
-    response = query_engine.query(query_str)
+   
+  
+    response = query_engine.query(test_query)
     
     print("\n--- Test Response ---")
     print(response)

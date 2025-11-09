@@ -3,7 +3,6 @@ import sys
 import os
 
 # PATH SETUP
-# Ensure the current directory is in Python path.
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -20,31 +19,12 @@ st.set_page_config(
     layout="wide"
 )
 
-#PROMPT TEMPLATE
-PROMPT_TEMPLATE = """
-Answer the user's query based *only* on the provided context.
-Your answer must be clear, concise, and professional.
 
-You MUST follow this format:
-1.  **Direct Answer:** (Your answer to the user's query)
-2.  **Source Code:** (The 'code' from the context, e.g., IRC:67-2022)
-3.  **Clause:** (The 'clause' from the context, e.g., 14.4)
-
-If the context does not contain the answer, state that "The provided database does not contain information on this specific topic."
-
----
-CONTEXT:
-{context_str}
----
-QUERY:
-{query_str}
-"""
-
-#LOAD CUSTOM CSS
 def load_css(file_name):
     """A function to inject a local CSS file."""
     try:
         with open(file_name) as f:
+           
             st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     except FileNotFoundError:
         st.warning(f" Warning: {file_name} not found. Styles may not apply.")
@@ -69,7 +49,8 @@ def load_rag_engine(_llm):
 load_css("style.css")
 
 # 2. SET UP HYBRID SWITCH
-google_api_key = st.secrets.get("GOOGLE_API_KEY", None) # Safer .get() with default None
+
+google_api_key = st.secrets.get("GOOGLE_API_KEY", None) 
 llm = get_llm(google_api_key)
 
 if google_api_key:
@@ -84,7 +65,7 @@ query_engine = load_rag_engine(llm)
 st.title("🛣️ National Road Safety Intervention GPT")
 st.markdown("Ask a question about road safety interventions from the provided database.")
 
-#Input Section
+# Input Section
 with st.container():
     st.info(f"Running in: **{model_mode}**")
     user_query = st.text_input("Enter your query:", 
@@ -93,30 +74,24 @@ with st.container():
     
     submit_button = st.button("Generate Answer")
 
-#Output Section
+# Output Section
 output_container = st.container()
 
 if submit_button:
     if not user_query:
         output_container.warning("Please enter a query.")
     else:
-       
         with st.spinner("Searching database and generating answer..."):
             try:
-                # 5. FORMAT QUERY
-                full_query = PROMPT_TEMPLATE.format(
-                    context_str="{context_str}",
-                    query_str=user_query
-                )
+                # 5. RUN QUERY
                 
-                # 6. RUN QUERY
-                response = query_engine.query(full_query)
+                response = query_engine.query(user_query)
                 
-                # 7. DISPLAY RESPONSE
+                # 6. DISPLAY RESPONSE
                 output_container.success("Answer generated successfully!")
                 output_container.markdown(str(response.response))
                 
-                # 8. DISPLAY SOURCES
+                # 7. DISPLAY SOURCES
                 with output_container.expander("Show Sources Used"):
                     if response.source_nodes:
                         for i, node in enumerate(response.source_nodes):
