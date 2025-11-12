@@ -122,7 +122,7 @@ def get_llm(google_api_key=None):
             print("-------------")
             sys.exit(1) 
 
-#TESTING
+
 if __name__ == "__main__":
     print("Testing LOCAL (Ollama) query engine...")
     local_llm = get_llm()

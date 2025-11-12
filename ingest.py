@@ -34,10 +34,10 @@ def load_data_from_excel(file_path):
 
     documents = []
     for _, row in df.iterrows():
-        # The data column has the main text
+        
         main_text = str(row.get('data', ''))
         
-        # All other columns become metadata
+       
         metadata = {
             "problem": str(row.get('problem', '')),
             "category": str(row.get('category', '')),
@@ -67,7 +67,7 @@ def build_and_store_index(documents, persist_dir):
     
     db = chromadb.PersistentClient(path=persist_dir)
     
-    # Create or get the collection
+  
     chroma_collection = db.get_or_create_collection(COLLECTION_NAME)
     
     # Assign ChromaDB
@@ -77,7 +77,7 @@ def build_and_store_index(documents, persist_dir):
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     
     print(f"Loading embedding model: {EMBED_MODEL_NAME}...")
-    # This model will run locally on CPU/GPU
+
    
     embed_model = HuggingFaceEmbedding(model_name=EMBED_MODEL_NAME)
     
@@ -87,7 +87,7 @@ def build_and_store_index(documents, persist_dir):
     Settings.chunk_size = 512 
     
     print("Embedding documents and building index... This may take a few minutes...")
-    # Create the index from documents
+
     
     index = VectorStoreIndex.from_documents(
         documents,
@@ -95,7 +95,7 @@ def build_and_store_index(documents, persist_dir):
     )
     
     print("Persisting index to disk...")
-    # The index is saved by ChromaDB 
+
     
     index.storage_context.persist(persist_dir=persist_dir)
     
